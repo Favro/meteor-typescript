@@ -1,5 +1,3 @@
-var fs = Npm.require("fs");
-var temp = Npm.require("temp");
 var typescript = Npm.require("typescript");
 
 var fullInputPaths = [];
@@ -9,17 +7,26 @@ Plugin.registerSourceHandler("ts", function(compileStep) {
 });
 
 Plugin.registerSourceHandler("ts-build", function(compileStep) {
-	var outFilePath = temp.path({ suffix: ".js" });
-
 	var options = {
-		out: outFilePath,
+		out: "out.js",
 		target: 1,
 		sourceMap: true,
 		removeComments: true,
 		noEmitOnError: true,
 	};
 
-	var program = typescript.createProgram(fullInputPaths, options);
+	var source = "";
+	var sourceMap = "";
+
+	var compilerHost = typescript.createCompilerHost(options);
+	compilerHost.writeFile = function(fileName, data, writeByteOrderMark, onError) {
+		if (fileName == "out.js")
+			source = data;
+		else
+			sourceMap = data;
+	};
+
+	var program = typescript.createProgram(fullInputPaths, options, compilerHost);
 	var emitResult = program.emit();
 
 	var allDiagnostics = typescript.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
@@ -38,18 +45,12 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 	});
 
 	if (!emitResult.emitSkipped) {
-		var source = fs.readFileSync(outFilePath, { encoding: "utf8" }) || "";
-		var sourceMap = fs.readFileSync(outFilePath + ".map", { encoding: "utf8" }) || "";
-
 		compileStep.addJavaScript({
 			path: compileStep.inputPath + ".js",
 			sourcePath: compileStep.inputPath,
 			data: source,
 			sourceMap: sourceMap,
 		});
-
-		fs.unlinkSync(outFilePath);
-		fs.unlinkSync(outFilePath + ".map");
 	}
 
 	fullInputPaths = [];

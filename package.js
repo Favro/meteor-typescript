@@ -12,6 +12,5 @@ Package.registerBuildPlugin({
 	],
 	npmDependencies: {
 		"typescript": "1.5.0-alpha",
-		"temp": "0.8.1",
 	}
 });
