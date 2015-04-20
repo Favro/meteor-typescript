@@ -1,9 +1,14 @@
+var fs = Npm.require("fs");
 var typescript = Npm.require("typescript");
 
 var fullInputPaths = [];
+var inputPathToFullPathMap = {};
+
+var sourceMapReferenceLineRegExp = new RegExp("//# sourceMappingURL=.*$", "m");
 
 Plugin.registerSourceHandler("ts", function(compileStep) {
 	fullInputPaths.push(compileStep.fullInputPath);
+	inputPathToFullPathMap[compileStep.inputPath] = compileStep.fullInputPath;
 });
 
 Plugin.registerSourceHandler("ts-build", function(compileStep) {
@@ -45,6 +50,22 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 	});
 
 	if (!emitResult.emitSkipped) {
+		// Remove source map reference line from generated js file.
+		// Meteor sets up source map through HTTP response header instead.
+		// FIXME: Should be an option for TypeScript compiler.
+		source = source.replace(sourceMapReferenceLineRegExp, "");
+
+		// FIXME: Embed sources directly in the source map, as there is no way to make Meteor serve them as files.
+		sourceMapObject = JSON.parse(sourceMap);
+		sourceMapObject.file = compileStep.pathForSourceMap;
+		sourceMapObject.sourcesContent = [];
+		sourceMapObject.sources.forEach(function(path) {
+			var fullPath = inputPathToFullPathMap[path];
+			var sourceContent = fs.readFileSync(fullPath, { encoding: "utf8" });
+			sourceMapObject.sourcesContent.push(sourceContent);
+		});
+		sourceMap = JSON.stringify(sourceMapObject);
+
 		compileStep.addJavaScript({
 			path: compileStep.inputPath + ".js",
 			sourcePath: compileStep.inputPath,
@@ -54,4 +75,5 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 	}
 
 	fullInputPaths = [];
+	inputPathToFullPathMap = {};
 });
