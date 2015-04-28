@@ -67,49 +67,6 @@ declare module Meteor {
 		constructor(error: number, reason?: string, details?: string);
 	}
 
-	interface Event {
-		type: string;
-		target: HTMLElement;
-		currentTarget: HTMLElement;
-		which: number;
-		stopPropagation(): void;
-		stopImmediatePropagation(): void;
-		preventDefault(): void;
-		isPropagationStopped(): boolean;
-		isImmediatePropagationStopped(): boolean;
-		isDefaultPrevented(): boolean;
-	}
-
-	interface HelpersMap {
-		[name: string]: any;
-	}
-
-	interface EventsMap {
-		[selector: string]: (event?: Event, tpl?: TemplateInstance) => void;
-	}
-
-	interface Template {
-		helpers(helpers: HelpersMap): void;
-		events(eventMap: EventsMap): void;
-
-		onRendered(callback: () => void): void;
-		onCreated(callback: () => void): void;
-		onDestroyed(callback: () => void): void;
-
-		rendered: () => void;
-		created: () => void;
-		destroyed: () => void;
-	}
-
-	interface TemplateInstance {
-		$(selector: string): JQuery;
-		find(selector: string): HTMLElement;
-		findAll(selector: string): HTMLElement[];
-		firstNode: HTMLElement;
-		lastNode: HTMLElement;
-		data: any;
-	}
-
 	interface UserEmail {
 		address: string;
 		verified: boolean;
@@ -330,12 +287,12 @@ declare class ReactiveVar<T> {
 }
 
 declare module Template {
-	function instance(): Meteor.TemplateInstance;
+	function instance(): Blaze.TemplateInstance;
 	function currentData(): any;
 	function parentData(numLevels?: number): any;
 	function registerHelper(name: string, func: Function): void;
 
-	var body: Meteor.Template;
+	var body: Blaze.Template;
 }
 
 declare module Match {
@@ -358,10 +315,38 @@ declare module ServiceConfiguration {
 }
 
 declare module Blaze {
-	interface Template {}
+	interface HelpersMap {
+		[name: string]: any;
+	}
+
+	interface EventsMap {
+		[selector: string]: (event?: JQueryEventObject, tpl?: TemplateInstance) => void;
+	}
+
+	interface Template {
+		helpers(helpers: HelpersMap): void;
+		events(eventMap: EventsMap): void;
+
+		onRendered(callback: () => void): void;
+		onCreated(callback: () => void): void;
+		onDestroyed(callback: () => void): void;
+
+		rendered: () => void;
+		created: () => void;
+		destroyed: () => void;
+	}
+
+	interface TemplateInstance {
+		$(selector: string): JQuery;
+		find(selector: string): HTMLElement;
+		findAll(selector: string): HTMLElement[];
+		firstNode: HTMLElement;
+		lastNode: HTMLElement;
+		data: any;
+	}
 
 	interface View {
-		templateInstance(): Meteor.TemplateInstance;
+		templateInstance(): Blaze.TemplateInstance;
 	}
 
 	function render(templateOrView: Template | View, parentNote: HTMLElement, nextNode?: HTMLElement, parentView?: View): void;
