@@ -1,17 +1,15 @@
 var fs = Npm.require("fs");
 var typescript = Npm.require("typescript");
 
-var fullInputPaths = [];
-var inputPathToFullPathMap = {};
-
 var sourceMapReferenceLineRegExp = new RegExp("//# sourceMappingURL=.*$", "m");
 
-Plugin.registerSourceHandler("ts", function(compileStep) {
-	fullInputPaths.push(compileStep.fullInputPath);
-	inputPathToFullPathMap[compileStep.inputPath] = compileStep.fullInputPath;
-});
+function compile(input) {
+	var result = {
+		source: "",
+		sourceMap: "",
+		errors: [],
+	};
 
-Plugin.registerSourceHandler("ts-build", function(compileStep) {
 	var options = {
 		out: "out.js",
 		target: 1,
@@ -20,18 +18,15 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 		noEmitOnError: true,
 	};
 
-	var source = "";
-	var sourceMap = "";
-
 	var compilerHost = typescript.createCompilerHost(options);
 	compilerHost.writeFile = function(fileName, data, writeByteOrderMark, onError) {
 		if (fileName == "out.js")
-			source = data;
+			result.source = data;
 		else
-			sourceMap = data;
+			result.sourceMap = data;
 	};
 
-	var program = typescript.createProgram(fullInputPaths, options, compilerHost);
+	var program = typescript.createProgram(input.fullPaths, options, compilerHost);
 	var emitResult = program.emit();
 
 	var allDiagnostics = typescript.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
@@ -43,37 +38,84 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 		var diagnosticCategory = typescript.DiagnosticCategory[diagnostic.category];
 		var message = typescript.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
 		var formattedMessage = diagnostic.file.fileName + ":" + line + ":" + character + ": " + diagnosticCategory + " TS" + diagnostic.code + ": " + message;
-
-		compileStep.error({
-			message: formattedMessage,
-		});
+		result.errors.push(formattedMessage);
 	});
 
 	if (!emitResult.emitSkipped) {
 		// Remove source map reference line from generated js file.
 		// Meteor sets up source map through HTTP response header instead.
 		// FIXME: Should be an option for TypeScript compiler.
-		source = source.replace(sourceMapReferenceLineRegExp, "");
+		result.source = result.source.replace(sourceMapReferenceLineRegExp, "");
 
 		// FIXME: Embed sources directly in the source map, as there is no way to make Meteor serve them as files.
-		sourceMapObject = JSON.parse(sourceMap);
-		sourceMapObject.file = compileStep.pathForSourceMap;
+		sourceMapObject = JSON.parse(result.sourceMap);
+		sourceMapObject.file = input.pathForSourceMap;
 		sourceMapObject.sourcesContent = [];
 		sourceMapObject.sources.forEach(function(path) {
-			var fullPath = inputPathToFullPathMap[path];
+			var fullPath = input.fullPathsMap[path];
 			var sourceContent = fs.readFileSync(fullPath, { encoding: "utf8" });
 			sourceMapObject.sourcesContent.push(sourceContent);
 		});
-		sourceMap = JSON.stringify(sourceMapObject);
+		result.sourceMap = JSON.stringify(sourceMapObject);
+	}
 
+	return result;
+}
+
+// Cache persists across plugin invocations.
+this.cache = this.cache || {};
+
+function cachedCompile(input) {
+	var key = "";
+
+	input.fullPaths.forEach(function(fullPath) {
+		key += fullPath;
+		key += ":";
+		key += fs.statSync(fullPath).mtime.getTime();
+		key += ":";
+	});
+
+	var archCache = cache[input.arch] || {};
+
+	if (archCache.key !== key) {
+		archCache.key = key;
+		archCache.result = compile(input);
+	}
+
+	cache[input.arch] = archCache;
+	return archCache.result;
+}
+
+var compileInput = {};
+
+Plugin.registerSourceHandler("ts", function(compileStep) {
+	compileInput.fullPaths = compileInput.fullPaths || [];
+	compileInput.fullPaths.push(compileStep.fullInputPath);
+
+	compileInput.fullPathsMap = compileInput.fullPathsMap || [];
+	compileInput.fullPathsMap[compileStep.inputPath] = compileStep.fullInputPath;
+});
+
+Plugin.registerSourceHandler("ts-build", function(compileStep) {
+	compileInput.arch = compileStep.arch;
+	compileInput.pathForSourceMap = compileStep.pathForSourceMap;
+
+	var result = cachedCompile(compileInput);
+
+	result.errors.forEach(function(message) {
+		compileStep.error({
+			message: message,
+		});
+	});
+
+	if (result.source) {
 		compileStep.addJavaScript({
 			path: compileStep.inputPath + ".js",
 			sourcePath: compileStep.inputPath,
-			data: source,
-			sourceMap: sourceMap,
+			data: result.source,
+			sourceMap: result.sourceMap,
 		});
 	}
 
-	fullInputPaths = [];
-	inputPathToFullPathMap = {};
+	compileInput = {};
 });
