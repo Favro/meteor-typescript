@@ -12,10 +12,33 @@ declare module Mongo {
 		[field: string]: number;
 	}
 
+	interface ObserveHandle {
+		stop(): void;
+	}
+
 	interface Cursor<T> {
 		count(): number;
 		forEach(callback: (doc: T, index?: number, cursor?: Cursor<T>) => void, thisArg?: any): void;
+		map(callback: (doc: T, index?: number, cursor?: Cursor<T>) => any, thisArg?: any): any[];
 		fetch(): T[];
+
+		observe(callbacks: {
+			added?(document?: T): void;
+			addedAt?(document?: T, atIndex?: number, before?: any): void;
+			changed?(newDocument?: T, oldDocument?: T): void;
+			changedAt?(newDocument?: T, oldDocument?: T, atIndex?: number): void;
+			removed?(oldDocument?: T): void;
+			removedAt?(oldDocument?: T, atIndex?: number): void;
+			movedTo?(document?: T, fromIndex?: number, toIndex?: number, before?: any): void;
+		}): ObserveHandle;
+
+		observeChanges(callbacks: {
+			added?(id?: any, fields?: any): void;
+			addedBefore?(id?: any, fields?: any, before?: any): void;
+			changed?(id?: any, fields?: any): void;
+			movedBefore?(id?: any, before?: any): void;
+			removed?(id?: any): void;
+		}): ObserveHandle;
 	}
 
 	var Collection: CollectionStatic;
@@ -59,6 +82,8 @@ declare module Mongo {
 
 		remove(selector: any): number;
 		remove(selector: any, callback: (err?: any, numAffected?: number) => void): void;
+
+		_makeNewID(): string;
 	}
 }
 
