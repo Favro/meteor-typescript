@@ -300,9 +300,31 @@ declare module DDP {
 }
 
 declare module Tracker {
-	function autorun(func: () => void): void;
+	interface Computation {
+		stop(): void;
+		invalidate(): void;
+		onInvalidate(callback: (computation?: Computation) => void): void;
+
+		stopped: boolean;
+		invalidated: boolean;
+		firstRun: boolean;
+	}
+
+	class Dependency {
+		constructor();
+		changed(): void;
+		depend(fromComputation?: Computation): boolean;
+		hasDependents(): boolean;
+	}
+
+	function autorun(func: (computation?: Computation) => void): void;
 	function flush(): void;
 	function afterFlush(func: () => void): void;
+	function nonreactive<T>(func: (...args: any[]) => T): T;
+	function onInvalidate(callback: (computation?: Computation) => void): void;
+
+	var active: boolean;
+	var currentComputation: Computation;
 }
 
 declare class ReactiveVar<T> {
@@ -365,6 +387,9 @@ declare module Blaze {
 		$(selector: string): JQuery;
 		find(selector: string): HTMLElement;
 		findAll(selector: string): HTMLElement[];
+		autorun(func: (computation?: Tracker.Computation) => void): void;
+		subscribe(name: string, ...args: any[]): Meteor.SubscriptionHandle;
+
 		firstNode: HTMLElement;
 		lastNode: HTMLElement;
 		data: any;
