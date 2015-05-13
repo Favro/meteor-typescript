@@ -396,14 +396,31 @@ declare module Blaze {
 	}
 
 	interface View {
-		templateInstance(): Blaze.TemplateInstance;
+		templateInstance(): TemplateInstance;
+		autorun(func: (computation?: Tracker.Computation) => void): void;
+		onViewCreated(func: () => void): void;
+		onViewReady(func: () => void): void;
+		onViewDestroyed(func: () => void): void;
+		firstNode(): HTMLElement;
+		lastNode(): HTMLElement;
+
+		name: string;
+		parentView: View;
+		isCreated: boolean;
+		isRendered: boolean;
+		isDestroyed: boolean;
+		renderCount: number;
+		template: Template;
 	}
 
-	function render(templateOrView: Template | View, parentNote: HTMLElement, nextNode?: HTMLElement, parentView?: View): void;
-	function renderWithData(templateOrView: Template | View, data: any, parentNote: HTMLElement, nextNode?: HTMLElement, parentView?: View): void;
+	function render(templateOrView: Template | View, parentNote: HTMLElement, nextNode?: HTMLElement, parentView?: View): View;
+	function renderWithData(templateOrView: Template | View, data: any, parentNote: HTMLElement, nextNode?: HTMLElement, parentView?: View): View;
+	function toHTML(templateOrView: Template | View): string;
+	function toHTMLWithData(templateOrView: Template | View, data: any): string;
 	function getData(elementOrView?: HTMLElement | View): any;
 	function getView(element?: HTMLElement): View;
 	function remove(renderedView: View): void;
+	function isTemplate(value: any): boolean;
 
 	var currentView: View;
 }
