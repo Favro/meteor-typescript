@@ -16,6 +16,18 @@ declare module Mongo {
 		stop(): void;
 	}
 
+	interface FindOneOptions<T> {
+		sort?: SortSpecifier;
+		skip?: number;
+		fields?: FieldSpecifier;
+		reactive?: boolean;
+		transform?: (doc: T) => T;
+	}
+
+	interface FindOptions<T> extends FindOneOptions<T> {
+		limit?: number;
+	}
+
 	interface Cursor<T> {
 		count(): number;
 		forEach(callback: (doc: T, index?: number, cursor?: Cursor<T>) => void, thisArg?: any): void;
@@ -48,22 +60,8 @@ declare module Mongo {
 	}
 
 	interface Collection<T> {
-		find(selector?: any, options?: {
-			sort?: SortSpecifier;
-			skip?: number;
-			limit?: number;
-			fields?: FieldSpecifier;
-			reactive?: boolean;
-			transform?: (doc: T) => T;
-		}): Cursor<T>;
-
-		findOne(selector?: any, options?: {
-			sort?: SortSpecifier;
-			skip?: number;
-			fields?: FieldSpecifier;
-			reactive?: boolean;
-			transform?: (doc: T) => T;
-		}): T;
+		find(selector?: any, options?: FindOptions<T>): Cursor<T>;
+		findOne(selector?: any, options?: FindOneOptions<T>): T;
 
 		insert(doc: T, callback?: (err?: any, id?: any) => void): any;
 
