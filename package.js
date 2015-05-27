@@ -11,6 +11,6 @@ Package.registerBuildPlugin({
 		"plugin/compile-typescript.js"
 	],
 	npmDependencies: {
-		"typescript": "1.5.0-alpha",
+		"typescript": "1.5.0-beta",
 	}
 });
