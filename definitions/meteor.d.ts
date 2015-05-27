@@ -171,6 +171,7 @@ declare module Meteor {
 	var isClient: boolean;
 	var isServer: boolean;
 	var isCordova: boolean;
+	var isSimulation: boolean;
 
 	var settings: any;
 	var release: string;
@@ -250,6 +251,8 @@ declare module Accounts {
 	function onCreateUser(func: (options: CreateUserOptions, user: Meteor.User) => Meteor.User): void;
 	function onEmailVerificationLink(func: (token: string, done: Function) => void): void;
 	function verifyEmail(token: string, callback?: (err?: any) => void): void;
+
+	function changePassword(oldPassword: string, newPassword: string, callback?: (err?: any) => void): void;
 
 	function forgotPassword(options: {
 		email?: string;
@@ -430,4 +433,12 @@ declare module Random {
 	function choice<T>(arrayOrString: Array<T>): T;
 	function choice(arrayOrString: string): string;
 	function hexString(n: number): string;
+}
+
+declare module LaunchScreen {
+	interface HoldHandle {
+		release(): void;
+	}
+
+	function hold(): HoldHandle;
 }
