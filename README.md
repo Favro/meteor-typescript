@@ -13,3 +13,7 @@ A Meteor package that enables use of TypeScript (`.ts` files).
 4. Add empty `main.ts-build` file at the top level. This is the file that triggers the actual compilation. All `.ts` files are passed to the compiler in one go, so that types are automatically visible across files, and to avoid Meteor file scoping that breaks TypeScript assumptions.
 
 Mixing languages (both plain JavaScript and TypeScript) in one project is not supported because all source files are expected to be processed at once (see #4 above).
+
+## Example
+
+See usage example here: https://github.com/Hansoft/meteor-typescript-example
