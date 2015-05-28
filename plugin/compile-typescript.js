@@ -37,8 +37,13 @@ function compile(input) {
 		var character = lineAndCharacter.character + 1;
 		var diagnosticCategory = typescript.DiagnosticCategory[diagnostic.category];
 		var message = typescript.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-		var formattedMessage = diagnostic.file.fileName + ":" + line + ":" + character + ": " + diagnosticCategory + " TS" + diagnostic.code + ": " + message;
-		result.errors.push(formattedMessage);
+
+		result.errors.push({
+			message: diagnosticCategory + " TS" + diagnostic.code + ": " + message,
+			sourcePath: diagnostic.file.fileName,
+			line: line,
+			column: character
+		});
 	});
 
 	if (!emitResult.emitSkipped) {
@@ -102,10 +107,8 @@ Plugin.registerSourceHandler("ts-build", function(compileStep) {
 
 	var result = cachedCompile(compileInput);
 
-	result.errors.forEach(function(message) {
-		compileStep.error({
-			message: message,
-		});
+	result.errors.forEach(function(error) {
+		compileStep.error(error);
 	});
 
 	if (result.source) {
