@@ -246,6 +246,21 @@ declare module Accounts {
 		profile?: Meteor.UserProfile;
 	}
 
+	interface LoginHandlerResult {
+		type?: string;
+		userId?: string;
+		error?: any;
+	}
+
+	type LoginHandler = (request: any) => LoginHandlerResult;
+
+	interface LoginMethodOptions {
+		methodName?: string;
+		methodArguments: any[];
+		validateResult?: (result: any) => void;
+		userCallback?: (error?: any) => void;
+	}
+
 	function validateLoginAttempt(func: (attempt: LoginAttempt) => any): void;
 	function onLogin(func: (attempt: LoginAttempt) => void): void;
 	function onCreateUser(func: (options: CreateUserOptions, user: Meteor.User) => Meteor.User): void;
@@ -271,6 +286,11 @@ declare module Accounts {
 	function createUser(options: CreateUserOptions, callback?: (err?: any) => void): void;
 
 	function loginServicesConfigured(): boolean;
+
+	function registerLoginHandler(handler: LoginHandler): void;
+	function registerLoginHandler(name: string, handler: LoginHandler): void;
+
+	function callLoginMethod(options: LoginMethodOptions): void;
 
 	var emailTemplates: EmailTemplates;
 	var urls: URLs;
@@ -318,7 +338,7 @@ declare module Tracker {
 		hasDependents(): boolean;
 	}
 
-	function autorun(func: (computation?: Computation) => void): void;
+	function autorun(func: (computation?: Computation) => void): Computation;
 	function flush(): void;
 	function afterFlush(func: () => void): void;
 	function nonreactive<T>(func: (...args: any[]) => T): T;
@@ -391,6 +411,7 @@ declare module Blaze {
 		autorun(func: (computation?: Tracker.Computation) => void): void;
 		subscribe(name: string, ...args: any[]): Meteor.SubscriptionHandle;
 
+		view: View;
 		firstNode: HTMLElement;
 		lastNode: HTMLElement;
 		data: any;

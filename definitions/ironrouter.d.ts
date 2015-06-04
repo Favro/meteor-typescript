@@ -18,12 +18,16 @@ declare module Router {
 		data: any;
 	}
 
+	type HookCallback = () => void;
+	type Hook = HookCallback | string;
+	type RouteCallback = () => void;
+
 	interface RouteConfig {
 		name?: string;
 		path?: string;
 		where?: string;
 		action?: () => void;
-		onBeforeAction?: () => void;
+		onBeforeAction?: Hook | Hook[];
 		onStop?: () => void;
 		template?: string;
 	}
@@ -33,12 +37,11 @@ declare module Router {
 		except?: string[];
 	}
 
-	type HookCallback = () => void;
-	type RouteCallback = () => void;
-
 	function configure(config: Config): void;
-	function route(path: string, config?: RouteConfig | RouteCallback): void;
+	function route(path: string, func: RouteCallback, config?: RouteConfig): void;
+	function route(path: string, config: RouteConfig): void;
 	function go(nameOrPath: string, params?: any, options?: any): void;
 	function current(): Controller;
-	function onBeforeAction(hookFuncOrName: HookCallback | string, options?: HookOptions): void;
+	function onBeforeAction(hook: Hook, options?: HookOptions): void;
+	function plugin(plugin: string, options?: any): void;
 }
