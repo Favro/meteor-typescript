@@ -115,9 +115,31 @@ declare module Meteor {
 		services?: UserServices;
 	}
 
+	interface Subscription {
+		added(collection: string, id: string, fields: any): void;
+		changed(collection: string, id: string, fields: any): void;
+		removed(collection: string, id: string): void;
+		ready(): void;
+		onStop(func: () => void): void;
+		error(error: any): void;
+		stop(): void;
+
+		userId: string;
+		connection: any;
+	}
+
 	interface SubscriptionHandle {
 		stop(): void;
 		ready(): boolean;
+	}
+
+	interface MethodInvocation {
+		setUserId(userId: string): void;
+		unblock(): void;
+
+		userId: string;
+		isSimulation: boolean;
+		connection: any;
 	}
 
 	function methods(methods: Object): void;
