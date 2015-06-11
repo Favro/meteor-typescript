@@ -485,3 +485,37 @@ declare module LaunchScreen {
 
 	function hold(): HoldHandle;
 }
+
+declare module HTTP {
+	interface Options {
+		content?: string;
+		data?: any;
+		query?: string;
+		params?: any;
+		auth?: string;
+		headers?: any;
+		timeout?: number;
+		followRedirects?: boolean;
+		npmRequestOptions?: any;
+	}
+
+	interface Result {
+		statusCode: number;
+		content: string;
+		data: any;
+		headers: any;
+	}
+
+	type Callback = (error: any, result: Result) => void;
+
+	function call(method: string, url: string, options?: Options): Result;
+	function call(method: string, url: string, options: Options, asyncCallback: Callback): void;
+	function get(url: string, options?: Options): Result;
+	function get(url: string, options: Options, asyncCallback: Callback): void;
+	function post(url: string, options?: Options): Result;
+	function post(url: string, options: Options, asyncCallback: Callback): void;
+	function put(url: string, options?: Options): Result;
+	function put(url: string, options: Options, asyncCallback: Callback): void;
+	function del(url: string, options?: Options): Result;
+	function del(url: string, options: Options, asyncCallback: Callback): void;
+}
