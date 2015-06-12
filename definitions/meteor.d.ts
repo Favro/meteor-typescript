@@ -404,6 +404,9 @@ declare module ServiceConfiguration {
 	var configurations: Mongo.Collection<any>;
 }
 
+interface JQuery {}
+interface JQueryEventObject {}
+
 declare module Blaze {
 	interface HelpersMap {
 		[name: string]: any;
