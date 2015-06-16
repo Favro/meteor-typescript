@@ -86,8 +86,17 @@ declare module Mongo {
 }
 
 declare module Meteor {
-	class Error {
-		constructor(error: number, reason?: string, details?: string);
+	var Error: ErrorStatic;
+
+	interface ErrorStatic {
+		new(error: number, reason?: string, details?: string): Error;
+	}
+
+	interface Error {
+		error: number;
+		reason?: string;
+		details?: string;
+		message: string;
 	}
 
 	interface UserEmail {
