@@ -531,3 +531,8 @@ declare module HTTP {
 	function del(url: string, options?: Options): Result;
 	function del(url: string, options: Options, asyncCallback: Callback): void;
 }
+
+declare module Base64 {
+	function encode(array: Uint8Array | string): string;
+	function decode(str: string): Uint8Array;
+}
