@@ -1,4 +1,5 @@
 var fs = Npm.require("fs");
+var path = Npm.require("path");
 var typescript = Npm.require("typescript");
 
 var sourceMapReferenceLineRegExp = new RegExp("//# sourceMappingURL=.*$", "m");
@@ -56,8 +57,8 @@ function compile(input) {
 		sourceMapObject = JSON.parse(result.sourceMap);
 		sourceMapObject.file = input.pathForSourceMap;
 		sourceMapObject.sourcesContent = [];
-		sourceMapObject.sources.forEach(function(path) {
-			var fullPath = input.fullPathsMap[path];
+		sourceMapObject.sources.forEach(function(sourcePath) {
+			var fullPath = path.join(process.cwd(), sourcePath);
 			var sourceContent = fs.readFileSync(fullPath, { encoding: "utf8" });
 			sourceMapObject.sourcesContent.push(sourceContent);
 		});
@@ -96,9 +97,6 @@ var compileInput = {};
 Plugin.registerSourceHandler("ts", function(compileStep) {
 	compileInput.fullPaths = compileInput.fullPaths || [];
 	compileInput.fullPaths.push(compileStep.fullInputPath);
-
-	compileInput.fullPathsMap = compileInput.fullPathsMap || [];
-	compileInput.fullPathsMap[compileStep.inputPath] = compileStep.fullInputPath;
 });
 
 Plugin.registerSourceHandler("ts-build", function(compileStep) {
