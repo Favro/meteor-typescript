@@ -2,7 +2,7 @@ Package.describe({
 	name: "hansoft:typescript",
 	summary: "TypeScript is a staticaly typed superset of JavaScript",
 	git: "https://github.com/Hansoft/meteor-typescript.git",
-	version: "1.0.1"
+	version: "1.0.1-rc.0"
 });
 
 Package.registerBuildPlugin({
