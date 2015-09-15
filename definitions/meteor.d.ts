@@ -4,12 +4,16 @@ declare module Mongo {
 		toHexString(): string;
 	}
 
+	interface Document {
+		_id?: string;
+	}
+
 	interface SortSpecifier {
 		[field: string]: number;
 	}
 
 	interface FieldSpecifier {
-		[field: string]: number;
+		[field: string]: boolean | number | FieldSpecifier;
 	}
 
 	interface ObserveHandle {
@@ -26,6 +30,25 @@ declare module Mongo {
 
 	interface FindOptions<T> extends FindOneOptions<T> {
 		limit?: number;
+	}
+
+	interface UpdateOptions {
+		multi?: boolean;
+		upsert?: boolean;
+	}
+
+	interface UpsertResult {
+		numberAffected: number;
+		insertedId: any;
+	}
+
+	type InsertCallback = (err?: any, id?: any) => void;
+	type UpdateCallback = (err?: any, numAffected?: number) => void;
+
+	interface CursorDescription<T> {
+		collectionName: string;
+		selector: any;
+		options: FindOptions<T>;
 	}
 
 	interface Cursor<T> {
@@ -51,38 +74,50 @@ declare module Mongo {
 			movedBefore?(id?: any, before?: any): void;
 			removed?(id?: any): void;
 		}): ObserveHandle;
+
+		_publishCursor(subscription: Meteor.Subscription): void;
+
+		_cursorDescription: CursorDescription<T>;
 	}
 
 	var Collection: CollectionStatic;
 
 	interface CollectionStatic {
-		new<T>(name: string): Collection<T>;
+		new<T extends Document>(name: string): Collection<T>;
 	}
 
 	interface Collection<T> {
 		find(selector?: any, options?: FindOptions<T>): Cursor<T>;
 		findOne(selector?: any, options?: FindOneOptions<T>): T;
 
-		insert(doc: T, callback?: (err?: any, id?: any) => void): any;
+		insert(doc: T, callback?: InsertCallback): any;
 
-		update(selector: any, modifier: any, options?: {
-			multi?: boolean;
-			upsert?: boolean;
-		}, callback?: (err?: any, numAffected?: number) => void): number;
-
-		upsert(selector: any, modifier: any, options?: {
-			multi?: boolean;
-			upsert?: boolean;
-		}, callback?: (err?: any, numAffected?: number) => void): {
-			numberAffected: number;
-			insertedId: any;
-		};
+		update(selector: any, modifier: any, options?: UpdateOptions, callback?: UpdateCallback): number;
+		upsert(selector: any, modifier: any, options?: UpdateOptions, callback?: UpdateCallback): UpsertResult;
 
 		remove(selector: any): number;
-		remove(selector: any, callback: (err?: any, numAffected?: number) => void): void;
+		remove(selector: any, callback: UpdateCallback): void;
 
 		_makeNewID(): string;
+
+		_name: string;
 	}
+}
+
+declare module Minimongo {
+	interface MatchResult {
+		result: boolean;
+	}
+
+	class Matcher {
+		constructor(selector: any);
+		documentMatches(doc: any): MatchResult;
+	}
+}
+
+declare module LocalCollection {
+	function _compileProjection(fields: Mongo.FieldSpecifier): (doc: Mongo.Document) => Mongo.Document;
+	function _idStringify(id: any): string;
 }
 
 declare module Meteor {
@@ -100,20 +135,42 @@ declare module Meteor {
 	}
 
 	interface UserEmail {
-		address: string;
-		verified: boolean;
+		address?: string;
+		verified?: boolean;
 	}
 
 	interface UserProfile {
-		name: string;
+		name?: string;
+	}
+
+	interface GitHubEmail {
+		email?: string;
+		primary?: boolean;
+		verified?: boolean;
+	}
+
+	interface GitHubService {
+		email?: string;
+		emails?: GitHubEmail[];
+		username?: string;
+		accessToken?: string;
+	}
+
+	interface GoogleService {
+		email?: string;
+		verified_email?: boolean;
+		picture?: string;
+		accessToken?: string;
+	}
+
+	interface PasswordService {
+		bcrypt?: string;
 	}
 
 	interface UserServices {
-		google: {
-			email: string;
-			verified_email: boolean;
-			picture: string;
-		};
+		github?: GitHubService;
+		google?: GoogleService;
+		password?: PasswordService;
 	}
 
 	interface User {
@@ -122,6 +179,15 @@ declare module Meteor {
 		emails?: UserEmail[];
 		profile?: UserProfile;
 		services?: UserServices;
+	}
+
+	interface Connection {
+		close(): void;
+		onClose(callback: Function): void;
+
+		id: string;
+		clientAddress: string;
+		httpHeaders: any;
 	}
 
 	interface Subscription {
@@ -134,7 +200,13 @@ declare module Meteor {
 		stop(): void;
 
 		userId: string;
-		connection: any;
+		connection: Connection;
+
+		_documents: {
+			[collectionName: string]: {
+				[id: string]: boolean;
+			};
+		};
 	}
 
 	interface SubscriptionHandle {
@@ -148,7 +220,13 @@ declare module Meteor {
 
 		userId: string;
 		isSimulation: boolean;
-		connection: any;
+		connection: Connection;
+	}
+
+	class EnvironmentVariable<T> {
+		constructor();
+		get(): T;
+		withValue<ReturnType>(value: T, func: () => ReturnType): ReturnType;
 	}
 
 	function methods(methods: Object): void;
@@ -163,6 +241,7 @@ declare module Meteor {
 
 	function startup(func: () => void): void;
 	function wrapAsync(func: Function, context?: any): Function;
+	function bindEnvironment(func: Function, errorFunc?: (err: any) => void, _this?: any): Function;
 
 	function setTimeout(func: () => void, delay: number): number;
 	function setInterval(func: () => void, delay: number): number;
@@ -177,6 +256,8 @@ declare module Meteor {
 	}): string;
 
 	function _debug(...args: any[]): void;
+	function _sleepForMs(ms: number): void;
+	function _noYieldsAllowed<T>(func: () => T): T;
 
 	interface LoginOptions {
 		requestPermissions?: string[];
@@ -184,10 +265,12 @@ declare module Meteor {
 		forceApprovalPrompt?: boolean;
 		userEmail?: string;
 		loginStyle?: string;
+		prompt?: string;
 	}
 
 	function loginWithGoogle(options?: LoginOptions, callback?: (err?: any) => void): void;
 	function loginWithPassword(user: Object | string, password: string, callback?: (err?: any) => void): void;
+	function loginWithGithub(options?: LoginOptions, callback?: (err?: any) => void): void;
 
 	function status(): {
 		connected: boolean;
@@ -219,7 +302,7 @@ declare module EJSON {
 	function equals(a: any, b: any, options: {
 		keyOrderSensitive?: boolean;
 	}): boolean;
-	function clone(val: any): any;
+	function clone<T>(val: T): T;
 	function newBinary(): any;
 	function isBinary(x: any): boolean;
 	function addType(name: string, factory: Function): void;
@@ -265,7 +348,7 @@ declare module Accounts {
 		allowed: boolean;
 		error: any;
 		user: Meteor.User;
-		connection: any;
+		connection: Meteor.Connection;
 		methodName: string;
 		methodArguments: any[];
 	}
@@ -294,9 +377,11 @@ declare module Accounts {
 
 	function validateLoginAttempt(func: (attempt: LoginAttempt) => any): void;
 	function onLogin(func: (attempt: LoginAttempt) => void): void;
+	function onLoginFailure(func: (attempt: LoginAttempt) => void): void;
 	function onCreateUser(func: (options: CreateUserOptions, user: Meteor.User) => Meteor.User): void;
 	function onEmailVerificationLink(func: (token: string, done: Function) => void): void;
 	function verifyEmail(token: string, callback?: (err?: any) => void): void;
+	function sendVerificationEmail(userId: string, email?: string): void;
 
 	function changePassword(oldPassword: string, newPassword: string, callback?: (err?: any) => void): void;
 
@@ -305,6 +390,10 @@ declare module Accounts {
 	}, callback?: (err?: any) => void): void;
 
 	function resetPassword(token: string, newPassword: string, callback?: (err?: any) => void): void;
+
+	function setPassword(userId: string, newPassword: string, options: {
+		logout?: boolean,
+	}): void;
 
 	function config(options: {
 		sendVerificationEmail?: boolean;
@@ -322,6 +411,8 @@ declare module Accounts {
 	function registerLoginHandler(name: string, handler: LoginHandler): void;
 
 	function callLoginMethod(options: LoginMethodOptions): void;
+
+	function updateOrCreateUserFromExternalService(serviceName: string, serviceData: any, options?: CreateUserOptions): LoginHandlerResult;
 
 	var emailTemplates: EmailTemplates;
 	var urls: URLs;
@@ -351,6 +442,16 @@ declare module DDP {
 	function randomStream(): RandomStream;
 }
 
+declare module DDPServer {
+	interface _WriteFence {
+		beginWrite(): {
+			committed(): void;
+		};
+	}
+
+	var _CurrentWriteFence: Meteor.EnvironmentVariable<_WriteFence>;
+}
+
 declare module Tracker {
 	interface Computation {
 		stop(): void;
@@ -372,7 +473,7 @@ declare module Tracker {
 	function autorun(func: (computation?: Computation) => void): Computation;
 	function flush(): void;
 	function afterFlush(func: () => void): void;
-	function nonreactive<T>(func: (...args: any[]) => T): T;
+	function nonreactive<T>(func: () => T): T;
 	function onInvalidate(callback: (computation?: Computation) => void): void;
 
 	var active: boolean;
@@ -401,6 +502,7 @@ declare module Match {
 	function Optional(pattern: any): any;
 	function OneOf(...patterns: any[]): any;
 	function Where(condition: Function): any;
+	function test(value: any, pattern: any): any;
 }
 
 declare function check(value: any, pattern: any): void;
