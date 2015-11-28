@@ -74,7 +74,7 @@ this.cache = this.cache || {};
 function cachedCompile(input) {
 	var key = "";
 
-	input.fullPaths.forEach(function(fullPath) {
+	input.fullPaths && input.fullPaths.forEach(function(fullPath) {
 		key += fullPath;
 		key += ":";
 		key += fs.statSync(fullPath).mtime.getTime();
