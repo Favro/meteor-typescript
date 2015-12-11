@@ -29,6 +29,7 @@ declare module Mongo {
 	}
 
 	interface FindOptions<T> extends FindOneOptions<T> {
+		sort?: any;
 		limit?: number;
 	}
 
@@ -54,7 +55,7 @@ declare module Mongo {
 	interface Cursor<T> {
 		count(): number;
 		forEach(callback: (doc: T, index?: number, cursor?: Cursor<T>) => void, thisArg?: any): void;
-		map(callback: (doc: T, index?: number, cursor?: Cursor<T>) => any, thisArg?: any): any[];
+		map<ReturnType>(callback: (doc: T, index?: number, cursor?: Cursor<T>) => ReturnType, thisArg?: any): ReturnType[];
 		fetch(): T[];
 
 		observe(callbacks: {
@@ -75,7 +76,7 @@ declare module Mongo {
 			removed?(id?: any): void;
 		}): ObserveHandle;
 
-		_publishCursor(subscription: Meteor.Subscription): void;
+		_publishCursor(subscription: DDPServer.Subscription): void;
 
 		_cursorDescription: CursorDescription<T>;
 	}
@@ -84,6 +85,7 @@ declare module Mongo {
 
 	interface CollectionStatic {
 		new<T extends Document>(name: string): Collection<T>;
+		get(collectionName: string): Collection<any>;
 	}
 
 	interface Collection<T> {
@@ -115,9 +117,13 @@ declare module Minimongo {
 	}
 }
 
+declare module MongoID {
+	function idStringify(id: any): string;
+	function idParse(id: string): any;
+}
+
 declare module LocalCollection {
 	function _compileProjection(fields: Mongo.FieldSpecifier): (doc: Mongo.Document) => Mongo.Document;
-	function _idStringify(id: any): string;
 }
 
 declare module Meteor {
@@ -181,58 +187,23 @@ declare module Meteor {
 		services?: UserServices;
 	}
 
-	interface Connection {
-		close(): void;
-		onClose(callback: Function): void;
-
-		id: string;
-		clientAddress: string;
-		httpHeaders: any;
-	}
-
-	interface Subscription {
-		added(collection: string, id: string, fields: any): void;
-		changed(collection: string, id: string, fields: any): void;
-		removed(collection: string, id: string): void;
-		ready(): void;
-		onStop(func: () => void): void;
-		error(error: any): void;
-		stop(): void;
-
-		userId: string;
-		connection: Connection;
-
-		_documents: {
-			[collectionName: string]: {
-				[id: string]: boolean;
-			};
-		};
-	}
-
-	interface SubscriptionHandle {
-		stop(): void;
-		ready(): boolean;
-	}
-
-	interface MethodInvocation {
-		setUserId(userId: string): void;
-		unblock(): void;
-
-		userId: string;
-		isSimulation: boolean;
-		connection: Connection;
-	}
-
 	class EnvironmentVariable<T> {
 		constructor();
 		get(): T;
 		withValue<ReturnType>(value: T, func: () => ReturnType): ReturnType;
 	}
 
-	function methods(methods: Object): void;
-	function publish(name: string, func: Function): void;
+	// NOTE: Same as in DDP.Connection interface.
+	function subscribe(name: string, ...args: any[]): DDP.SubscriptionHandle;
 	function call(name: string, ...args: any[]): any;
-	function subscribe(name: string, ...args: any[]): SubscriptionHandle;
+	function apply(name: string, args: any[], options?: DDP.CallOptions, asyncCallback?: Function): any;
+	function methods(methods: Object): void;
+	function status(): DDP.ConnectionStatus;
+	function reconnect(): void;
+	function disconnect(): void;
+	//
+
+	function publish(name: string, func: Function): void;
 
 	function user(): User;
 	function userId(): string;
@@ -272,34 +243,29 @@ declare module Meteor {
 	function loginWithPassword(user: Object | string, password: string, callback?: (err?: any) => void): void;
 	function loginWithGithub(options?: LoginOptions, callback?: (err?: any) => void): void;
 
-	function status(): {
-		connected: boolean;
-		status: string;
-		retryCount: number;
-		retryTime?: number;
-		reason?: string;
-	};
-
 	var users: Mongo.Collection<User>;
 
 	var isClient: boolean;
 	var isServer: boolean;
 	var isCordova: boolean;
-	var isSimulation: boolean;
 
 	var settings: any;
 	var release: string;
+
+	var connection: DDP.Connection;
+
+	function npmRequire(package: string): any; // FIXME: Does not belong here.
 }
 
 declare module EJSON {
 	function parse(str: string): any;
-	function stringify(val: any, options: {
+	function stringify(val: any, options?: {
 		indent?: boolean | number | string;
 		canonical?: boolean;
 	}): string;
 	function fromJSONValue(val: any): any;
 	function toJSONValue(val: any): any;
-	function equals(a: any, b: any, options: {
+	function equals(a: any, b: any, options?: {
 		keyOrderSensitive?: boolean;
 	}): boolean;
 	function clone<T>(val: T): T;
@@ -348,7 +314,7 @@ declare module Accounts {
 		allowed: boolean;
 		error: any;
 		user: Meteor.User;
-		connection: Meteor.Connection;
+		connection: DDPServer.ConnectionHandle;
 		methodName: string;
 		methodArguments: any[];
 	}
@@ -434,15 +400,104 @@ declare module Email {
 	function send(options: Options): void;
 }
 
+declare module DDPCommon {
+	interface MethodInvocation {
+		setUserId(userId: string): void;
+		unblock(): void;
+
+		userId: string;
+		isSimulation: boolean;
+		connection: DDPServer.ConnectionHandle;
+	}
+}
+
 declare module DDP {
 	interface RandomStream {
 		hexString(numChars: number): string;
 	}
 
+	interface SubscriptionHandle {
+		stop(): void;
+		ready(): boolean;
+	}
+
+	interface CallOptions {
+		wait?: boolean;
+		onResultReceived?: Function;
+	}
+
+	interface ConnectionStatus {
+		connected: boolean;
+		status: string;
+		retryCount: number;
+		retryTime?: number;
+		reason?: string;
+	}
+
+	interface Connection {
+		// NOTE: Same as in Meteor module.
+		subscribe(name: string, ...args: any[]): SubscriptionHandle;
+		call(name: string, ...args: any[]): any;
+		apply(name: string, args: any[], options?: CallOptions, asyncCallback?: Function): any;
+		methods(methods: Object): void;
+		status(): ConnectionStatus;
+		reconnect(): void;
+		disconnect(): void;
+		//
+
+		// NOTE: Optional to make Meteor global object match DDP.Connection interface.
+		onReconnect?: () => void;
+
+		_stream?: {
+			_retry: {
+				baseTimeout: number;
+				exponent: number;
+				fuzz: number;
+				maxTimeout: number;
+				minCount: number;
+				minTimeout: number;
+			};
+		};
+	}
+
 	function randomStream(): RandomStream;
+	function connect(url: string): any;
+
+	var _CurrentInvocation: Meteor.EnvironmentVariable<DDPCommon.MethodInvocation>;
 }
 
 declare module DDPServer {
+	interface ConnectionHandle {
+		close(): void;
+		onClose(callback: Function): void;
+
+		id: string;
+		clientAddress: string;
+		httpHeaders: any;
+	}
+
+	interface Subscription {
+		added(collection: string, id: string, fields: any): void;
+		changed(collection: string, id: string, fields: any): void;
+		removed(collection: string, id: string): void;
+		ready(): void;
+		onStop(func: () => void): void;
+		error(error: any): void;
+		stop(): void;
+
+		userId: string;
+		connection: DDPServer.ConnectionHandle;
+
+		_documents: {
+			[collectionName: string]: {
+				[id: string]: boolean;
+			};
+		};
+
+		_subscriptionId: string
+		_subscriptionHandle: string;
+	}
+
 	interface _WriteFence {
 		beginWrite(): {
 			committed(): void;
@@ -456,6 +511,7 @@ declare module Tracker {
 	interface Computation {
 		stop(): void;
 		invalidate(): void;
+		onStop(callback: (computation?: Computation) => void): void;
 		onInvalidate(callback: (computation?: Computation) => void): void;
 
 		stopped: boolean;
@@ -527,7 +583,9 @@ declare module Blaze {
 		[selector: string]: (event?: JQueryEventObject, tpl?: TemplateInstance) => void;
 	}
 
-	interface Template {
+	class Template {
+		constructor(viewName: string, renderFunction: () => any);
+
 		helpers(helpers: HelpersMap): void;
 		events(eventMap: EventsMap): void;
 
@@ -538,14 +596,19 @@ declare module Blaze {
 		rendered: () => void;
 		created: () => void;
 		destroyed: () => void;
+
+		viewName: string;
 	}
 
-	interface TemplateInstance {
+	class TemplateInstance {
+		constructor(view: View);
+
 		$(selector: string): JQuery;
 		find(selector: string): HTMLElement;
 		findAll(selector: string): HTMLElement[];
 		autorun(func: (computation?: Tracker.Computation) => void): void;
-		subscribe(name: string, ...args: any[]): Meteor.SubscriptionHandle;
+		subscribe(name: string, ...args: any[]): DDP.SubscriptionHandle;
+		subscriptionsReady(): boolean;
 
 		view: View;
 		firstNode: HTMLElement;
@@ -553,7 +616,9 @@ declare module Blaze {
 		data: any;
 	}
 
-	interface View {
+	class View {
+		constructor(viewName: string, renderFunction: () => any);
+
 		templateInstance(): TemplateInstance;
 		autorun(func: (computation?: Tracker.Computation) => void): void;
 		onViewCreated(func: () => void): void;
@@ -561,6 +626,8 @@ declare module Blaze {
 		onViewDestroyed(func: () => void): void;
 		firstNode(): HTMLElement;
 		lastNode(): HTMLElement;
+
+		_onViewRendered(func: () => void): void;
 
 		name: string;
 		parentView: View;
@@ -576,9 +643,17 @@ declare module Blaze {
 	function toHTML(templateOrView: Template | View): string;
 	function toHTMLWithData(templateOrView: Template | View, data: any): string;
 	function getData(elementOrView?: HTMLElement | View): any;
-	function getView(element?: HTMLElement): View;
+	function getView(elementOrView?: HTMLElement | View, viewName?: string): View;
+	function getView(viewName: string): View;
 	function remove(renderedView: View): void;
 	function isTemplate(value: any): boolean;
+
+	function If(conditionFunc: () => boolean, contentFunc: () => any, elseFunc: () => any): View;
+	function Unless(conditionFunc: () => boolean, contentFunc: () => any, elseFunc: () => any): View;
+	function Each(items: () => any, renderItem: () => any): View;
+	function With(data: any, contentFunc: () => any): View;
+
+	function _addEventMap(view: View, eventsMap: EventsMap): void;
 
 	var currentView: View;
 }
@@ -602,7 +677,7 @@ declare module LaunchScreen {
 
 declare module HTTP {
 	interface Options {
-		content?: string;
+		content?: any;
 		data?: any;
 		query?: string;
 		params?: any;
@@ -611,6 +686,7 @@ declare module HTTP {
 		timeout?: number;
 		followRedirects?: boolean;
 		npmRequestOptions?: any;
+		beforeSend?: (xhr: XMLHttpRequest) => boolean | void;
 	}
 
 	interface Result {
@@ -637,4 +713,19 @@ declare module HTTP {
 declare module Base64 {
 	function encode(array: Uint8Array | string): string;
 	function decode(str: string): Uint8Array;
+}
+
+declare var SHA256: (input: string) => string;
+
+declare module HTML {
+	interface Tag {
+		children: any[];
+	}
+
+	type TagConstructor = (attributes: any, ...children: any[]) => Tag;
+
+	// Add more tags as needed.
+	var A, DIV, IMG, SPAN: TagConstructor;
+
+	function Raw(html: string): any;
 }

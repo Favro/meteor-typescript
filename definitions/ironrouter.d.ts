@@ -1,22 +1,27 @@
 declare module Iron {
 	function controller(): any;
-}
 
-declare module Router {
+	interface RouterStatic {
+		bodyParser: any;
+		hooks: any;
+	}
+
+	var Router: RouterStatic;
+
 	type HookCallback = () => void;
-	export type Hook = HookCallback | string;
+	export type RouteHook = HookCallback | string;
+	export type RouteHooks = RouteHook | RouteHook[];
 	type RouteCallback = () => void;
 
-	interface Config {
+	interface RouterOptions {
 		layoutTemplate?: string;
 		notFoundTemplate?: string;
 		loadingTemplate?: string;
 
-		waitOn?: () => Meteor.SubscriptionHandle[];
+		waitOn?: () => DDP.SubscriptionHandle[];
 	}
 
 	interface Route {
-		name: string;
 		getName(): string;
 		path(): string;
 
@@ -26,39 +31,85 @@ declare module Router {
 		delete(func: RouteCallback): Route;
 	}
 
-	interface Controller {
+	interface RouteController {
 		route: Route;
 		params: any;
 		data: any;
+
+		_rendered: boolean;
+
+		next(): void;
+		wait(handle: DDP.SubscriptionHandle);
+		ready(): boolean;
+
+		render(template: string, options?: {
+			data?: any;
+		});
+
+		redirect(nameOrPath: string, params?: any, options?: {
+			replaceState?: boolean;
+		});
 	}
 
-	interface RouteConfig {
+	interface RouteOptions {
 		name?: string;
-		path?: string;
+		path?: string | RegExp;
 		where?: string;
 		action?: () => void;
-		onRun?: Hook | Hook[];
-		onRerun?: Hook | Hook[];
-		onBeforeAction?: Hook | Hook[];
-		onAfterAction?: Hook | Hook[];
-		onStop?: Hook | Hook[];
+		onRun?: RouteHooks;
+		onRerun?: RouteHooks;
+		onBeforeAction?: RouteHooks;
+		onAfterAction?: RouteHooks;
+		onStop?: RouteHooks;
 		template?: string;
 	}
 
-	interface HookOptions {
+	interface RouteHookOptions {
 		only?: string[];
 		except?: string[];
 	}
 
-	function configure(config: Config): void;
-	function route(path: string, func: RouteCallback, config?: RouteConfig): Route;
-	function route(path: string, config?: RouteConfig): Route;
-	function go(nameOrPath: string, params?: any, options?: any): void;
-	function current(): Controller;
-	function onRun(hook: Hook, options?: HookOptions): void;
-	function onRerun(hook: Hook, options?: HookOptions): void;
-	function onBeforeAction(hook: Hook, options?: HookOptions): void;
-	function onAfterAction(hook: Hook, options?: HookOptions): void;
-	function onStop(hook: Hook, options?: HookOptions): void;
-	function plugin(plugin: string, options?: any): void;
+	interface Router {
+		configure(options: RouterOptions): void;
+		route(path: string, func: RouteCallback, options?: RouteOptions): Route;
+		route(path: string, options?: RouteOptions): Route;
+		go(nameOrPath: string, params?: any, options?: any): void;
+		current(): RouteController;
+		onRun(hook: RouteHook, options?: RouteHookOptions): void;
+		onRerun(hook: RouteHook, options?: RouteHookOptions): void;
+		onBeforeAction(hook: RouteHook, options?: RouteHookOptions): void;
+		onAfterAction(hook: RouteHook, options?: RouteHookOptions): void;
+		onStop(hook: RouteHook, options?: RouteHookOptions): void;
+		plugin(plugin: string, options?: any): void;
+		configureBodyParsers(): void;
+	}
+}
+
+declare var Router: Iron.Router;
+
+declare module Iron.Url {
+	interface UrlQueryObject {
+		[s: string]: string;
+	}
+
+	interface UrlObject {
+		rootUrl: string;
+		originalUrl: string;
+		href: string;
+		protocol: string;
+		auth: string;
+		host: string;
+		hostname: string;
+		port: string;
+		origin: string;
+		path: string;
+		pathname: string;
+		search: string;
+		query: string;
+		queryObject: UrlQueryObject;
+		hash: string;
+		slashes: boolean;
+	}
+
+	function parse(url: string): UrlObject;
 }
