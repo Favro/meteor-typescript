@@ -4,6 +4,13 @@ var typescript = Npm.require("typescript");
 
 var sourceMapReferenceLineRegExp = new RegExp("//# sourceMappingURL=.*$", "m");
 
+function archMatches(arch, pattern) {
+	if (arch.substr(0, pattern.length) != pattern)
+		return false;
+
+	return arch.length == pattern.length || arch[pattern.length] == ".";
+}
+
 function compile(input) {
 	var result = {
 		source: "",
@@ -11,12 +18,20 @@ function compile(input) {
 		errors: [],
 	};
 
+	var target = 1; // ES5
+	if (archMatches(input.arch, "os"))
+		target = 4; // ES2017
+
 	var options = {
 		out: "out.js",
-		target: 1,
+		target: target,
 		sourceMap: true,
+		alwaysStrict: true,
 		removeComments: true,
 		noEmitOnError: true,
+		noStrictGenericChecks: true,
+		exclude: [ "node_modules" ],
+		types: [],
 	};
 
 	var compilerHost = typescript.createCompilerHost(options);
@@ -92,9 +107,18 @@ function cachedCompile(input) {
 	return archCache.result;
 }
 
+var packageName = null;
 var compileInput = {};
 
 Plugin.registerSourceHandler("ts", function(compileStep) {
+	if (compileStep.fileOptions && compileStep.fileOptions.transpile === false)
+		return;
+
+	if (packageName != compileStep.packageName) {
+		packageName = compileStep.packageName;
+		compileInput = {};
+	}
+
 	compileInput.fullPaths = compileInput.fullPaths || [];
 	compileInput.fullPaths.push(compileStep.fullInputPath);
 });

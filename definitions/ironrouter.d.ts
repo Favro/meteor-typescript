@@ -8,10 +8,10 @@ declare module Iron {
 
 	var Router: RouterStatic;
 
-	type HookCallback = () => void;
+	type HookCallback = (this: RouteController) => void;
 	export type RouteHook = HookCallback | string;
 	export type RouteHooks = RouteHook | RouteHook[];
-	type RouteCallback = () => void;
+	type RouteCallback = (this: RouteController) => void;
 
 	interface RouterOptions {
 		layoutTemplate?: string;
@@ -23,7 +23,7 @@ declare module Iron {
 
 	interface Route {
 		getName(): string;
-		path(): string;
+		path(params?: any, options?: any): string;
 
 		get(func: RouteCallback): Route;
 		post(func: RouteCallback): Route;
@@ -31,31 +31,51 @@ declare module Iron {
 		delete(func: RouteCallback): Route;
 	}
 
+	interface RouterGoOptions {
+		replaceState?: boolean;
+		query?: string | { [key: string]: string | number | boolean };
+	}
+
 	interface RouteController {
-		route: Route;
-		params: any;
-		data: any;
-
-		_rendered: boolean;
-
+		stop(): void;
 		next(): void;
 		wait(handle: DDP.SubscriptionHandle);
 		ready(): boolean;
 
 		render(template: string, options?: {
 			data?: any;
+			to?: string
 		});
 
-		redirect(nameOrPath: string, params?: any, options?: {
-			replaceState?: boolean;
-		});
+		redirect(nameOrPath: string, params?: any, options?: RouterGoOptions);
+
+		route: Route;
+		params: {
+			query: any;
+			hash: string;
+			[param: string]: string;
+		};
+		data: any;
+		request: any;
+		response: any;
+		layout: any;
+
+		_rendered: boolean;
+
+		_layout: {
+			_regions: {
+				[name: string]: {
+					_template: string;
+				};
+			};
+		};
 	}
 
 	interface RouteOptions {
 		name?: string;
 		path?: string | RegExp;
 		where?: string;
-		action?: () => void;
+		action?: RouteCallback;
 		onRun?: RouteHooks;
 		onRerun?: RouteHooks;
 		onBeforeAction?: RouteHooks;
@@ -69,11 +89,16 @@ declare module Iron {
 		except?: string[];
 	}
 
+	interface RouteHookEntry {
+		hook: RouteHook;
+		options: RouteHookOptions;
+	}
+
 	interface Router {
 		configure(options: RouterOptions): void;
 		route(path: string, func: RouteCallback, options?: RouteOptions): Route;
 		route(path: string, options?: RouteOptions): Route;
-		go(nameOrPath: string, params?: any, options?: any): void;
+		go(nameOrPath: string, params?: any, options?: RouterGoOptions): void;
 		current(): RouteController;
 		onRun(hook: RouteHook, options?: RouteHookOptions): void;
 		onRerun(hook: RouteHook, options?: RouteHookOptions): void;
@@ -82,6 +107,15 @@ declare module Iron {
 		onStop(hook: RouteHook, options?: RouteHookOptions): void;
 		plugin(plugin: string, options?: any): void;
 		configureBodyParsers(): void;
+		url(routeName: string, params?: any, options?: RouterGoOptions): string;
+
+		routes: {
+			[name: string]: Route;
+		};
+
+		_globalHooks: {
+			onRun: RouteHookEntry[];
+		};
 	}
 }
 
